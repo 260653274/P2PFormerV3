@@ -1,5 +1,12 @@
 ## 依赖
 
+```{warning}
+本页是仓库内置的 MMDetection 2.x 通用参考文档。安装本 P2PFormer 分支时，
+请使用仓库 README 中的命令，并严格安装 `mmcv-full==1.7.2`。不要安装
+MMCV 2.x 的 `mmcv` 或 `mmcv-lite`。下方通用版本示例仅作为上游
+MMDetection 历史文档保留。
+```
+
 - Linux 和 macOS （Windows 理论上支持）
 - Python 3.6+
 - PyTorch 1.3+

@@ -1,29 +1,23 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import mmcv
+import warnings
 
-from .version import __version__, short_version
+warnings.filterwarnings(
+    'ignore',
+    message=r'On January 1, 2023, MMCV will release v2\.0\.0',
+    category=UserWarning,
+    module=r'mmcv')
 
+import mmcv  # noqa: E402
 
-def digit_version(version_str):
-    digit_version = []
-    for x in version_str.split('.'):
-        if x.isdigit():
-            digit_version.append(int(x))
-        elif x.find('rc') != -1:
-            patch_version = x.split('rc')
-            digit_version.append(int(patch_version[0]) - 1)
-            digit_version.append(int(patch_version[1]))
-    return digit_version
+from .mmcv_compat import (  # noqa: E402
+    MMCV_REQUIRED_VERSION, check_mmcv_version,
+    patch_mmcv_parallel_for_torch)
+from .version import __version__, short_version  # noqa: E402
 
+check_mmcv_version(mmcv.__version__)
+patch_mmcv_parallel_for_torch()
 
-mmcv_minimum_version = '1.3.17'
-mmcv_maximum_version = '1.7.0'
-mmcv_version = digit_version(mmcv.__version__)
-
-
-# assert (mmcv_version >= digit_version(mmcv_minimum_version)
-#         and mmcv_version <= digit_version(mmcv_maximum_version)), \
-#     f'MMCV=={mmcv.__version__} is used but incompatible. ' \
-#     f'Please install mmcv>={mmcv_minimum_version}, <={mmcv_maximum_version}.'
-
-__all__ = ['__version__', 'short_version']
+__all__ = [
+    '__version__', 'short_version', 'MMCV_REQUIRED_VERSION',
+    'check_mmcv_version', 'patch_mmcv_parallel_for_torch'
+]

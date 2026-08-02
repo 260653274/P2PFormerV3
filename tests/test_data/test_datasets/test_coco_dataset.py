@@ -56,3 +56,42 @@ def test_coco_annotation_ids_unique():
     # test annotation ids not unique error
     with pytest.raises(AssertionError):
         CocoDataset(ann_file=fake_json_file, classes=('car', ), pipeline=[])
+
+
+def test_coco_annotation_without_info_supports_load_results():
+    """COCO ``info`` is optional but pycocotools 2.0.10 requires it."""
+    tmp_dir = tempfile.TemporaryDirectory()
+    fake_json_file = osp.join(tmp_dir.name, 'fake_data.json')
+    fake_json = {
+        'images': [{
+            'id': 0,
+            'width': 640,
+            'height': 640,
+            'file_name': 'fake_name.jpg',
+        }],
+        'annotations': [{
+            'id': 1,
+            'image_id': 0,
+            'category_id': 0,
+            'area': 400,
+            'bbox': [50, 60, 20, 20],
+            'iscrowd': 0,
+        }],
+        'categories': [{
+            'id': 0,
+            'name': 'car',
+            'supercategory': 'car',
+        }]
+    }
+    mmcv.dump(fake_json, fake_json_file)
+
+    dataset = CocoDataset(
+        ann_file=fake_json_file, classes=('car', ), pipeline=[])
+    result_api = dataset.coco.loadRes([{
+        'image_id': 0,
+        'category_id': 0,
+        'score': 1.0,
+        'bbox': [50, 60, 20, 20],
+    }])
+
+    assert result_api.dataset['info'] == {}

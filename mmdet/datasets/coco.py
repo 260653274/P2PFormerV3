@@ -70,6 +70,11 @@ class CocoDataset(CustomDataset):
         """
 
         self.coco = COCO(ann_file)
+        # pycocotools>=2.0.10 unconditionally copies ``dataset['info']`` in
+        # COCO.loadRes(), although ``info`` is optional in COCO-style datasets.
+        # Keep legacy datasets such as WHU-Mix evaluable without rewriting the
+        # source annotation JSON.
+        self.coco.dataset.setdefault('info', {})
         # The order of returned `cat_ids` will not
         # change with the order of the CLASSES
         self.cat_ids = self.coco.get_cat_ids(cat_names=self.CLASSES)

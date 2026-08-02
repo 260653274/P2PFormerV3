@@ -1,5 +1,30 @@
 # MMDetection v2.x 兼容性说明
 
+## P2PFormer 运行时边界
+
+本仓库内置 MMDetection 2.25.1，并且只支持
+`mmcv-full==1.7.2`。编译后的 MMCV 必须包含目标 GPU 架构对应的
+CUDA 算子。安装完成后运行：
+
+```shell
+python tools/check_mmcv_compatibility.py
+```
+
+MMCV 2.x 不能直接替换本分支使用的 MMCV 1.x。MMCV 2.x 已删除项目大量
+使用的旧接口，包括 `mmcv.runner`、`mmcv.parallel`，以及 MMCV 1.x 的
+Config 和 Registry 实现。因此，项目检测到其他 MMCV 版本时会立即终止，
+并给出明确的修复信息。真正升级到 MMCV 2.x 必须将整个项目同步迁移到
+MMDetection 3.x 和 MMEngine，包括配置、注册器、数据集、模型、训练循环
+和检查点处理。
+
+PyTorch 2.8 还将 DataParallel 内部流函数的参数从整数 GPU 编号改为了
+`torch.device`。P2PFormer 导入时会为 MMCV 1.7.2 的 scatter 应用一个
+最小范围的适配器；兼容性检查脚本会执行一次真实的 CPU 到 GPU scatter，
+防止该路径再次失效。
+
+请参考官方 [MMCV 2.x API 参考](https://mmcv.readthedocs.io/zh-cn/latest/get_started/api_reference.html)
+以及 [MMDetection 2.x 到 3.x 迁移指南](https://mmdetection.readthedocs.io/zh-cn/latest/migration/migration.html)。
+
 ## MMDetection 2.25.0
 
 为了加入 Mask2Former 实例分割模型，对 Mask2Former 的配置文件进行了重命名 [PR #7571](https://github.com/open-mmlab/mmdetection/pull/7571)：

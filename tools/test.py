@@ -5,6 +5,8 @@ import os.path as osp
 import time
 import warnings
 
+from mmdet import check_mmcv_version
+
 import mmcv
 import torch
 from mmcv import Config, DictAction
@@ -19,6 +21,8 @@ from mmdet.models import build_detector
 from mmdet.utils import (build_ddp, build_dp, compat_cfg, get_device,
                          replace_cfg_vals, setup_multi_processes,
                          update_data_root)
+
+check_mmcv_version(mmcv.__version__)
 
 
 def parse_args():

@@ -1,5 +1,13 @@
 # Prerequisites
 
+```{warning}
+This is the embedded MMDetection 2.x reference guide. For this P2PFormer
+branch, use the installation commands in the repository README and install
+exactly `mmcv-full==1.7.2`. Do not install the MMCV 2.x packages `mmcv` or
+`mmcv-lite`. The generic version examples below are retained only as upstream
+MMDetection documentation.
+```
+
 In this section we demonstrate how to prepare an environment with PyTorch.
 
 MMDetection works on Linux, Windows and macOS. It requires Python 3.6+, CUDA 9.2+ and PyTorch 1.5+.

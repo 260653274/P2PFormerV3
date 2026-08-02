@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+
+# Local datasets, checkpoints, and experiment artifacts.
+data/
+checkpoints/
+work_dirs/

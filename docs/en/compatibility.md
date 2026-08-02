@@ -1,5 +1,31 @@
 # Compatibility of MMDetection 2.x
 
+## P2PFormer runtime boundary
+
+This repository embeds MMDetection 2.25.1 and supports exactly
+`mmcv-full==1.7.2`. The compiled MMCV package must include CUDA operators
+for the target GPU. Run the following check after installation:
+
+```shell
+python tools/check_mmcv_compatibility.py
+```
+
+MMCV 2.x is not a drop-in replacement for this branch. It removes legacy
+APIs used throughout the project, including `mmcv.runner`, `mmcv.parallel`,
+and the MMCV 1.x Config and Registry implementations. Importing this project
+with any other MMCV version therefore fails early with an actionable error.
+A real MMCV 2.x upgrade requires migrating the complete project to
+MMDetection 3.x and MMEngine, including configs, registries, datasets,
+models, training loops, and checkpoint handling.
+
+PyTorch 2.8 also changed its internal DataParallel stream helper from integer
+GPU IDs to `torch.device` values. P2PFormer applies a narrowly scoped adapter
+to MMCV 1.7.2 scatter at import time; the compatibility checker executes a
+real CPU-to-GPU scatter to guard this path.
+
+See the official [MMCV 2.x API reference](https://mmcv.readthedocs.io/en/latest/get_started/api_reference.html)
+and [MMDetection 2.x to 3.x migration guide](https://mmdetection.readthedocs.io/en/latest/migration/migration.html).
+
 ## MMDetection 2.25.0
 
 In order to support Mask2Former for instance segmentation, the original config files of Mask2Former for panpotic segmentation need to be renamed [PR #7571](https://github.com/open-mmlab/mmdetection/pull/7571).
