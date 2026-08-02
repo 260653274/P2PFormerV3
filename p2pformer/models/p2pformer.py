@@ -85,12 +85,28 @@ class P2PFormerSegmentor(SingleStageDetector):
             x_line, x_bbox = x, x
         losses = self.bbox_head.forward_train(x_bbox[self.detector_fpn_start_level:], img_metas, gt_bboxes,
                                               gt_labels, gt_bboxes_ignore)
+        detector_proposals = None
+        wants_proposals = getattr(self.line_head,
+                                  'requires_detector_proposals', None)
+        if callable(wants_proposals) and wants_proposals():
+            # Proposal selection is discrete by design.  The FCOS branch keeps
+            # learning exclusively from its clean detection objective above.
+            with torch.no_grad():
+                proposal_results = self.bbox_head.simple_test(
+                    x_bbox[self.detector_fpn_start_level:],
+                    img_metas,
+                    rescale=False)
+                detector_proposals = [
+                    result[0][..., :4].detach() for result in proposal_results
+                ]
         if self.line_fpn:
             losses.update(self.line_head.forward_train(x_line[self.line_fpn_start_level:], img_metas, gt_bboxes,
-                                                       gt_lines, matched_idxs))
+                                                       gt_lines, matched_idxs,
+                                                       detector_proposals=detector_proposals))
         else:
             losses.update(self.line_head.forward_train(x_line[self.line_fpn_start_level], img_metas, gt_bboxes,
-                                                       gt_lines, matched_idxs))
+                                                       gt_lines, matched_idxs,
+                                                       detector_proposals=detector_proposals))
         return losses
 
     def simple_test(self, img, img_metas, rescale=False, mode='line', **kwargs):
@@ -138,10 +154,12 @@ class P2PFormerSegmentor(SingleStageDetector):
             return list(zip(bbox_results, mask_results))
         if self.line_fpn:
             lines, lines_scores, lines_idxs = self.line_head.simple_test(x_line[self.line_fpn_start_level:],
-                                                                                       img_metas, bboxes_pred)
+                                                                                       img_metas, bboxes_pred,
+                                                                                       boxes_are_rescaled=rescale)
         else:
             lines, lines_scores, lines_idxs = self.line_head.simple_test(x_line[self.line_fpn_start_level],
-                                                                                       img_metas, bboxes_pred)
+                                                                                       img_metas, bboxes_pred,
+                                                                                       boxes_are_rescaled=rescale)
         num_polygons_per_img = [len(item) for item in bboxes_pred]
         lines, lines_scores, lines_idxs = lines.split(num_polygons_per_img, dim=0), \
             lines_scores.split(num_polygons_per_img, dim=0), \
@@ -208,28 +226,64 @@ class P2PFormerSegmentor(SingleStageDetector):
         if ignore_contour2mask:
             return (mask_pred, bboxes_pred, labels_pred)
         labels_pred_ret = labels_pred
-        labels_pred = labels_pred.detach().cpu().numpy()
+        labels_pred_np = labels_pred.detach().cpu().numpy()
         rles = []
-        if True:
-            saved_vector_contours = []
-            for contour in contours_pred:
-                contour[..., 0] = contour[..., 0] / img_shape[0] * ori_shape[0]
-                contour[..., 1] = contour[..., 1] / img_shape[1] * ori_shape[1]
-                contour = contour.flatten().tolist()
-                if len(contour) < 6:
-                    if len(contour) == 0:
-                        contour = [0] * 6
-                    else:
-                        contour += [contour[-1]] * 6
-                saved_vector_contours.append(contour)
-                rle = maskUtils.frPyObjects([contour], ori_shape[0], ori_shape[1])
-                rles += rle
-            masks = maskUtils.decode(rles).transpose(2, 0, 1)
+        saved_vector_contours = []
+        valid_indices = []
+        scale_factor = np.asarray(
+            img_meta.get('scale_factor', 1.0), dtype=np.float32).reshape(-1)
+        if scale_factor.size == 1:
+            scale_x = scale_y = float(scale_factor[0])
+        else:
+            scale_x, scale_y = float(scale_factor[0]), float(scale_factor[1])
+        flip = bool(img_meta.get('flip', False))
+        flip_direction = img_meta.get('flip_direction', 'horizontal')
 
-            # # for visualization polygon, save the vector polygon as json and draw it
-            # self.save_vector_result(img_meta['ori_filename'], saved_vector_contours,
-            #                         list(bboxes_pred[:, -1].cpu().numpy()))
-        for mask, label in zip(masks, labels_pred):
+        for contour_index, contour in enumerate(contours_pred):
+            contour = np.asarray(contour, dtype=np.float32).reshape(-1, 2).copy()
+            if contour.shape[0] < 3 or not np.isfinite(contour).all():
+                continue
+            if flip and flip_direction in ('horizontal', 'diagonal'):
+                contour[:, 0] = img_shape[1] - contour[:, 0]
+            if flip and flip_direction in ('vertical', 'diagonal'):
+                contour[:, 1] = img_shape[0] - contour[:, 1]
+            contour[:, 0] /= max(scale_x, 1e-8)
+            contour[:, 1] /= max(scale_y, 1e-8)
+            contour[:, 0] = np.clip(contour[:, 0], 0, ori_shape[1] - 1)
+            contour[:, 1] = np.clip(contour[:, 1], 0, ori_shape[0] - 1)
+            shifted = np.roll(contour, -1, axis=0)
+            signed_area = 0.5 * np.abs(
+                np.sum(contour[:, 0] * shifted[:, 1] -
+                       shifted[:, 0] * contour[:, 1]))
+            if signed_area <= 1e-4:
+                continue
+            flat_contour = contour.flatten().tolist()
+            try:
+                rle = maskUtils.frPyObjects(
+                    [flat_contour], ori_shape[0], ori_shape[1])
+            except (TypeError, ValueError):
+                continue
+            rles += rle
+            saved_vector_contours.append(flat_contour)
+            valid_indices.append(contour_index)
+
+        if not valid_indices:
+            return (mask_pred, bboxes_pred[:0], labels_pred_ret[:0])
+
+        valid_indices_tensor = bboxes_pred.new_tensor(
+            valid_indices, dtype=torch.long)
+        bboxes_pred = bboxes_pred.index_select(0, valid_indices_tensor)
+        labels_pred_ret = labels_pred_ret.index_select(0, valid_indices_tensor)
+        labels_pred_np = labels_pred_np[np.asarray(valid_indices)]
+        masks = maskUtils.decode(rles)
+        if masks.ndim == 2:
+            masks = masks[..., None]
+        masks = masks.transpose(2, 0, 1)
+
+        # # for visualization polygon, save the vector polygon as json and draw it
+        # self.save_vector_result(img_meta['ori_filename'], saved_vector_contours,
+        #                         list(bboxes_pred[:, -1].cpu().numpy()))
+        for mask, label in zip(masks, labels_pred_np):
             mask_pred[int(label)].append(mask)
         return (mask_pred, bboxes_pred, labels_pred_ret)
 

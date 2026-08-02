@@ -43,6 +43,7 @@ from .yolof_head import YOLOFHead
 from .yolox_head import YOLOXHead
 from .contour_head import BaseContourProposalHead, BaseContourEvolveHead
 from p2pformer.models.p2pformer_head import P2PFormerHead
+from p2pformer.models.p2pformer_v3_head import P2PFormerV3Head
 
 __all__ = [
     'AnchorFreeHead', 'AnchorHead', 'GuidedAnchorHead', 'FeatureAdaption',
@@ -57,5 +58,5 @@ __all__ = [
     'SOLOHead', 'DecoupledSOLOHead', 'CenterNetHead', 'YOLOXHead',
     'DecoupledSOLOLightHead', 'LADHead', 'TOODHead', 'MaskFormerHead',
     'Mask2FormerHead', 'SOLOV2Head', 'DDODHead', 'BaseContourProposalHead',
-    'BaseContourEvolveHead', 'P2PFormerHead',
+    'BaseContourEvolveHead', 'P2PFormerHead', 'P2PFormerV3Head',
 ]
